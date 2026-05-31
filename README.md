@@ -6,8 +6,8 @@ Built with Python, SQLAlchemy, and a local LLM running via Ollama. No API keys, 
 
 
 <img width="687" height="199" alt="LLM_SQL_bot" src="https://github.com/user-attachments/assets/da0e3a82-ed7d-43af-811b-b88862b07ff2" />
-<img width="1620" height="163" alt="LLM_SQL_bot_respone" src="https://github.com/user-attachments/assets/7da79cfd-d817-46f1-a527-75269fe6173c" />
-<img width="1622" height="152" alt="LLM_response" src="https://github.com/user-attachments/assets/88e36e23-7bd9-4f1e-8735-b9ba7bb95d60" />
+<img width="1607" height="213" alt="LLM_response_0107" src="https://github.com/user-attachments/assets/3b981e4c-7ad2-4f5f-b932-bb18c4a55494" />
+
 
 
 
