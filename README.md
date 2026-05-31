@@ -5,6 +5,11 @@ A command-line tool that lets you query your SQL Server database in plain Englis
 Built with Python, SQLAlchemy, and a local LLM running via Ollama. No API keys, no cost, runs entirely on your machine.
 
 
+<img width="687" height="199" alt="LLM_SQL_bot" src="https://github.com/user-attachments/assets/da0e3a82-ed7d-43af-811b-b88862b07ff2" />
+<img width="1620" height="163" alt="LLM_SQL_bot_respone" src="https://github.com/user-attachments/assets/7da79cfd-d817-46f1-a527-75269fe6173c" />
+<img width="1622" height="152" alt="LLM_response" src="https://github.com/user-attachments/assets/88e36e23-7bd9-4f1e-8735-b9ba7bb95d60" />
+
+
 
 
 
