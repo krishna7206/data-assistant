@@ -6,6 +6,8 @@ import os
 
 load_dotenv()
 
+# connect and extract schema once
+
 engine = create_engine(os.getenv("DB_URL"))
 
 registry = extract(engine)
