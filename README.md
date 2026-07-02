@@ -13,7 +13,7 @@ Built with Python, SQLAlchemy, and a local LLM running via Ollama. No API keys, 
 <img width="835" height="265" alt="image" src="https://github.com/user-attachments/assets/2257cd0f-d0df-4725-bf06-597d86c1abfd" />
 
 
-
+ 
 
 
 
