@@ -85,16 +85,3 @@ def extract(engine):
     return SchemaRegistry(tables=tables)
 
 
-# connect and run
-engine = create_engine(
-    "mssql+pymssql://datauser:MyPassword123!@172.29.0.1:55358/salesdb"
-)
-
-registry = extract(engine)
-print(registry.to_prompt_context())
-
-for table in registry.tables:
-    print(f"\nTable: {table.name} ({table.row_count} rows)")
-    for col in table.columns:
-        pk = " PK" if col.primary_key else ""
-        print(f"  {col.name} ({col.dtype}){pk}")

@@ -6,8 +6,6 @@ import os
 
 load_dotenv()
 
-# connect and extract schema once
-print(os.getenv("DB_URL"))
 engine = create_engine(os.getenv("DB_URL"))
 
 registry = extract(engine)
@@ -17,7 +15,8 @@ print("✅ Connected to salesdb")
 print(f"📋 Found {len(registry.tables)} tables: {', '.join(t.name for t in registry.tables)}")
 print("\nAsk a question about your data (or type 'exit' to quit)\n")
 
-# interactive loop
+history = []
+
 while True:
     question = input("You: ").strip()
 
@@ -29,17 +28,29 @@ while True:
         continue
 
     try:
-        # generate and run SQL
-        sql = generate_sql(question, schema_context, registry.tables)
-        print(f"\nSQL: {sql}\n")
+        # 1. generate SQL
+        sql = generate_sql(question, schema_context, registry.tables, history)
+        #print(f"\nSQL: {sql}\n")
 
+        # 2. run SQL and get rows
         with engine.connect() as conn:
             result = conn.execute(text(sql))
             rows = result.fetchall()
+            headers = list(result.keys())
 
-        # explain results
+        
+
+        # 4. explain results
         explanation = explain_results(question, sql, rows)
-        print(f"Answer: {explanation}\n")
+        print(f"Explanation: {explanation}\n")
+        
+
+        # 5. update history
+        history.append({"role": "user", "content": question})
+        history.append({"role": "assistant", "content": explanation})
+
+        if len(history) > 8:
+            history = history[-8:]
 
     except Exception as e:
         print(f"Error: {e}\n")
