@@ -1,0 +1,79 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout the repository code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Set up Docker Buildx for cleaner layer caching
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 3. Build the Docker image to verify there are no compile/dependency issues
+      - name: Build Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true # Loads the built image directly into the local Docker daemon
+          tags: nl-sql-assistant:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 4. Create dummy environment file and database directories so the container runs safely in CI
+      - name: Prepare Test Environment
+        run: |
+          mkdir -p database
+          touch database/dev.db
+          echo "DB_URL=sqlite:///database/dev.db" > .env
+          echo "FLASK_SECRET_KEY=ci-testing-secret-key" >> .env
+          echo "OLLAMA_MODEL=llama3.2" >> .env
+          echo "OLLAMA_HOST=http://ollama:11434" >> .env
+
+      # 5. Boot up the service infrastructure via Docker Compose
+      - name: Start Services
+        run: docker compose up -d
+
+      # 6. Monitor the container until the healthcheck command finishes initializing successfully
+      - name: Verify Container Health
+        run: |
+          echo "Waiting for application container to become healthy..."
+          
+          # Increased to 36 retries (3 minutes total) to give Ollama time to pull the model
+          for i in {1..36}; do
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' nl-sql-assistant 2>/dev/null || echo "starting")
+            echo "Current Status: $STATUS"
+            
+            if [ "$STATUS" = "healthy" ]; then
+              echo "Success! Container is healthy and passing endpoints."
+              exit 0
+            elif [ "$STATUS" = "unhealthy" ]; then
+              echo "Error: Container reported an unhealthy state."
+              docker logs nl-sql-assistant
+              docker logs ollama
+              exit 1
+            fi
+            sleep 5
+          done
+
+          echo "Timeout: Container did not transition to a healthy state in time."
+          echo "=== Assistant Logs ==="
+          docker logs nl-sql-assistant
+          echo "=== Ollama Logs ==="
+          docker logs ollama
+          exit 1
+
+      # 7. Gracefully spin down container logs and print them out for workflow artifacts if everything finishes
+      - name: Stop Services
+        if: always()
+        run: docker compose down

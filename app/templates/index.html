@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Natural Language SQL Assistant</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <header>
+
+        <h1>Natural Language SQL Assistant</h1>
+
+        <p class="subtitle">
+            Connected to {{ table_count }} tables
+        </p>
+
+        <p class="tables">
+            {{ tables }}
+        </p>
+
+    </header>
+
+    <form method="POST">
+
+        <label for="question">
+            Ask a question about your data
+        </label>
+
+        <textarea
+            id="question"
+            name="question"
+            rows="4"
+            placeholder="Example: Show me the top 10 customers by sales."
+        >{{ question }}</textarea>
+
+        <button type="submit">
+            Ask
+        </button>
+
+    </form>
+
+
+    {% if error %}
+
+    <div class="card error">
+
+        <h2>Error</h2>
+
+        <pre>{{ error }}</pre>
+
+    </div>
+
+    {% endif %}
+
+
+    {% if sql %}
+
+    <div class="card">
+
+        <h2>Generated SQL</h2>
+
+        <pre>{{ sql }}</pre>
+
+    </div>
+
+    {% endif %}
+
+
+    {% if headers %}
+
+    <div class="card">
+
+        <h2>Results</h2>
+
+        <div class="table-wrapper">
+
+        <table>
+
+            <thead>
+
+                <tr>
+
+                {% for h in headers %}
+
+                    <th>{{ h }}</th>
+
+                {% endfor %}
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+            {% for row in rows %}
+
+                <tr>
+
+                {% for value in row %}
+
+                    <td>{{ value }}</td>
+
+                {% endfor %}
+
+                </tr>
+
+            {% endfor %}
+
+            </tbody>
+
+        </table>
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+
+    {% if explanation %}
+
+    <div class="card">
+
+        <h2>AI Explanation</h2>
+
+        <p>{{ explanation }}</p>
+
+    </div>
+
+    {% endif %}
+
+
+</div>
+
+</body>
+</html>

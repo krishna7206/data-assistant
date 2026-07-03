@@ -1,5 +1,8 @@
 import ollama
 import re
+import os
+
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
 
 def fix_groupby(sql: str) -> str:
     # find GROUP BY clause
@@ -114,7 +117,7 @@ SQL:
 """
 
     response = ollama.chat(
-        model="llama3.2",
+        model=OLLAMA_MODEL,
         messages= history + [{"role": "user", "content": prompt}]
     )
 

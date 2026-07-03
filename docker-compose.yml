@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  nl-sql-assistant:
+    build:
+      context: .
+    container_name: nl-sql-assistant
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    volumes:
+      - ./database:/app/database
+      - ./app:/app
+    restart: unless-stopped
+    depends_on:
+      - ollama  # Ensures Ollama spins up first
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama  # Persists your downloaded LLM models
+    restart: unless-stopped
+    # This entrypoint boots up the Ollama server, waits for it, and automatically downloads the model
+    entrypoint: [
+      "/bin/sh", 
+      "-c", 
+      "ollama serve & sleep 5 && ollama pull llama3.2 && wait"
+    ]
+
+volumes:
+  ollama_data:  # Declares the persistent volume for LLM storage
