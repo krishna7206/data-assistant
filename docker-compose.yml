@@ -14,13 +14,8 @@ services:
       - ./app:/app
     restart: unless-stopped
     depends_on:
-      - ollama  # Ensures Ollama spins up first
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
+      ollama:
+        condition: service_healthy  # Wait specifically until Ollama is fully healthy and ready
 
   ollama:
     image: ollama/ollama:latest
@@ -28,10 +23,17 @@ services:
     ports:
       - "11434:11434"
     volumes:
-      - ollama_data:/root/.ollama  # Persists your downloaded LLM models
+      - ollama_data:/root/.ollama
     restart: unless-stopped
-    # This entrypoint boots up the Ollama server, waits for it, and automatically downloads the model
-    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull qwen2.5:0.5b && wait"]
+    # 1. Removed the complex background wait logic. The container runs standard 'serve'.
+    entrypoint: ["ollama", "serve"]
+    # 2. Added a native health check that automatically pulls your model once the engine boots
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1 && ollama pull qwen2.5:0.5b"]
+      interval: 10s
+      timeout: 30s
+      retries: 5
+      start_period: 5s
 
 volumes:
-  ollama_data:  # Declares the persistent volume for LLM storage
+  ollama_data:
