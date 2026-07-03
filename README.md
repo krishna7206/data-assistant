@@ -21,7 +21,7 @@ Built with Python, SQLAlchemy, and a local LLM running via Ollama. No API keys, 
 
 ---
 
-## 💬 Example Queries
+ Example Queries
 
 **"Which department has the highest salary?"**
 ```
@@ -54,15 +54,14 @@ $200 in total sales, while USA has generated $180 in total sales.
 
 ---
 
-## 🛠️ How It Works
+ How It Works
 
 1. **Schema Extractor** — connects to your database and automatically discovers all tables, columns, types, and row counts. Formats everything into a prompt the LLM can understand.
 2. **NL to SQL Engine** — takes your question and the schema context, sends it to a local LLM via Ollama, and gets SQL back. Automatically fixes common SQL Server syntax issues.
 3. **Result Explainer** — passes the query results back to the LLM and generates a plain English summary.
 
 ---
-
-## ⚙️ Setup
+ Setup
 
 ### Prerequisites
 
@@ -119,7 +118,7 @@ python main.py
 
 ---
 
-## 🗂️ Project Structure
+ Project Structure
 
 ```
 data-assistant/
@@ -143,7 +142,7 @@ data-assistant/
 
 ---
 
-## ⚠️ Notes
+ Notes
 
 - This tool generates and runs SQL automatically. It is configured as read-only via the `db_datareader` role but always review generated SQL before running in production.
 - The assistant works best with [Ollama](https://ollama.com) running in the background. Start it with `ollama serve` if it is not already running.
@@ -151,7 +150,7 @@ data-assistant/
 
 ---
 
-## 🚀 What's Next
+ What's Next
 
 
 
