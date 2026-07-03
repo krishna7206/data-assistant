@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
     depends_on:
       ollama:
-        condition: service_healthy  # Wait specifically until Ollama is fully healthy and ready
+        condition: service_healthy  # Blocks until Ollama completes boot & model download
 
   ollama:
     image: ollama/ollama:latest
@@ -25,14 +25,23 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped
-    # 1. Removed the complex background wait logic. The container runs standard 'serve'.
-    entrypoint: ["ollama", "serve"]
-    # 2. Added a native health check that automatically pulls your model once the engine boots
+    # Use a sidecar entrypoint pattern: Boot serve, wait for the socket via bash, pull model, then hold process
+    entrypoint: >
+      /bin/sh -c "
+      ollama serve & 
+      pid=\$!; 
+      echo 'Waiting for Ollama port...'; 
+      while ! case [[:alpha:]] in *) (echo > /dev/tcp/127.0.0.1/11434) 2>/dev/null ;; esac; do sleep 1; done; 
+      echo 'Pulling micro-model...';
+      ollama pull qwen2.5:0.5b; 
+      wait \$pid
+      "
+    # Clean check verifying the main loop state matches without relying on curl
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1 && ollama pull qwen2.5:0.5b"]
+      test: ["CMD-SHELL", "ollama list | grep -q 'qwen2.5:0.5b' || exit 1"]
       interval: 10s
-      timeout: 30s
-      retries: 5
+      timeout: 10s
+      retries: 6
       start_period: 5s
 
 volumes:
