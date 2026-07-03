@@ -1,4 +1,4 @@
-# 🤖 NL to SQL Data Assistant
+ NL to SQL Data Assistant
 
 A command-line tool that lets you query your SQL Server database in plain English. Ask a question, get an answer — no SQL knowledge required.
 
