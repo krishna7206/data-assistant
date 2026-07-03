@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  nl-sql-assistant:
+    build:
+      context: .
+    container_name: nl-sql-assistant
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    volumes:
+      - ./database:/app/database
+      - ./app:/app
+    restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    # The entrypoint spawns the engine, waits for the socket, and handles the download seamlessly in the background
+    entrypoint: >
+      /bin/sh -c "
+      ollama serve & 
+      pid=\$!; 
+      echo 'Waiting for Ollama engine to spin up...'; 
+      while ! case [[:alpha:]] in *) (echo > /dev/tcp/127.0.0.1/11434) 2>/dev/null ;; esac; do sleep 1; done; 
+      echo 'Downloading micro-model layers...';
+      ollama pull qwen2.5:0.5b; 
+      wait \$pid
+      "
+    # An elegant health check that verifies the engine is up immediately, preventing CI flakes
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list > /dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 2s
+
+volumes:
+  ollama_data:

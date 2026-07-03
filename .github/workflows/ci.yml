@@ -1,0 +1,48 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout the repository code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Set up Docker Buildx for cleaner layer caching
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      # 3. Authenticate against GitHub Container Registry (ghcr.io)
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }} # Automatically provided by GitHub Actions
+
+      # 4. Lowercase the repository name (Docker tags must be strictly lowercase)
+      - name: Format Image Name
+        id: string
+        run: echo "image_name=$(echo 'ghcr.io/${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      # 5. Build the self-contained image AND push it to GHCR
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true  # Loads it to the local runner daemon so we can test it in step 7
+          push: ${{ github.event_name != 'pull_request' }} # Only push to GHCR on main branch commits, not PRs
+          tags: |
+            ${{ steps.string.outputs.image_name }}:latest
+            ${{ steps.string.outputs.image_name }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
