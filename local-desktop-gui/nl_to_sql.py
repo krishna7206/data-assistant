@@ -78,7 +78,7 @@ def fix_sql(sql: str, tables: list) -> str:
     return sql.strip()
     
 
-def generate_sql(question: str, schema_context: str, tables: list, history: list) -> str:
+def generate_sql(question: str, schema_context: str, tables: list, history: list, retry_context: tuple = None) -> str:
     prompt = f"""
 You are a SQL Server expert. Given the database schema below, write a SQL query to answer the user's question.
 
@@ -89,7 +89,8 @@ Rules:
 - Always use the full table name including schema, e.g. Sales.Orders not just Orders
 - Use SQL Server syntax, so TOP instead of LIMIT
 - Every column in the SELECT list must either be in an aggregate function like SUM() or COUNT(), or be in the GROUP BY clause
-- If the query uses only ONE table, do NOT use a table alias — write the full schema.table name in front of each column instead
+- If the query uses only ONE table and does not join it to itself, do NOT use a table alias — write the full schema.table name in front of each column instead
+- If a question compares a row to another row in the SAME table (e.g. an employee vs their manager, who is also a row in Employees), that is a self-join: join the table to itself with two different aliases, do NOT use AVG() or join to an unrelated table
 - Only use table aliases (like c, o) when joining two or more tables, and always define the alias in the FROM/JOIN clause before using it
 - NEVER reference an alias (e.g. x.Column) unless that exact alias was defined in a FROM or JOIN clause in this same query
 - For "top N per group" questions (e.g. top 2 per country), do NOT use TOP alone — TOP only limits the whole result, not per group. Use ROW_NUMBER() OVER (PARTITION BY <group column> ORDER BY <metric> DESC) in a subquery, then filter WHERE rn <= N in the outer query
@@ -112,7 +113,21 @@ Question: Top 2 customers by total sales, per country?
 Thinking: need per-country ranking, not a global TOP, so rank within each country then keep rn <= 2
 SQL: SELECT Country, CustomerID, TotalSales FROM (SELECT c.Country, c.CustomerID, SUM(o.Sales) AS TotalSales, ROW_NUMBER() OVER (PARTITION BY c.Country ORDER BY SUM(o.Sales) DESC) AS rn FROM Sales.Customers c INNER JOIN Sales.Orders o ON c.CustomerID = o.CustomerID GROUP BY c.Country, c.CustomerID) ranked WHERE rn <= 2
 
+Example 4 (self-join, comparing a row to another row in the same table):
+Question: Which employees earn more than their manager?
+Thinking: Employees.ManagerID points back to another row's EmployeeID in the same table — join Employees to itself, not to a different table, and do NOT average
+SQL: SELECT e.FirstName, e.LastName FROM Sales.Employees e INNER JOIN Sales.Employees m ON e.ManagerID = m.EmployeeID WHERE e.Salary > m.Salary
+
 Question: {question}
+SQL:
+"""
+
+    if retry_context:
+        failed_sql, error_message = retry_context
+        prompt += f"""
+Your previous attempt failed. Fix the query.
+Failed SQL: {failed_sql}
+Database error: {error_message}
 SQL:
 """
 

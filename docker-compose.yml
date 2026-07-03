@@ -1,12 +1,10 @@
-version: "3.9"
-
 services:
   nl-sql-assistant:
     build:
       context: .
     container_name: nl-sql-assistant
     ports:
-      - "8080:8080"
+      - "7860:7860"
     env_file:
       - .env
     restart: unless-stopped

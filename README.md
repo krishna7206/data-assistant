@@ -1,99 +1,65 @@
  NL to SQL Data Assistant
 
-A command-line tool that lets you query your SQL Server database in plain English. Ask a question, get an answer — no SQL knowledge required.
+Query your database in plain English. Two ways to run it:
 
-Now added in a GUI interface where we are able to see the conversation history as well as improved the prompt to the underling LLM improving answer quality
-
-Built with Python, SQLAlchemy, and a local LLM running via Ollama. No API keys, no cost, runs entirely on your machine.
-
-
-<img width="687" height="199" alt="LLM_SQL_bot" src="https://github.com/user-attachments/assets/da0e3a82-ed7d-43af-811b-b88862b07ff2" />
-<img width="1607" height="213" alt="LLM_response_0107" src="https://github.com/user-attachments/assets/3b981e4c-7ad2-4f5f-b932-bb18c4a55494" />
-<img width="1602" height="181" alt="LLM_response_0109" src="https://github.com/user-attachments/assets/2b4d13b8-03ba-4afd-b9dc-cd368556251f" />
-<img width="806" height="621" alt="image" src="https://github.com/user-attachments/assets/2481725a-7ab9-460d-a194-50bb69e18115" />
-
-
+- **Web app** (`app.py`) — self-contained Flask app, local LLM via `llama-cpp-python` (no Ollama, no API keys), ships in Docker with a bundled Qwen2.5-0.5B model. Works against a demo SQLite database out of the box.
+- **Desktop GUI** (`local-desktop-gui/`) — Tkinter app that talks to SQL Server through Ollama (`llama3.2`), with conversation history and auto-retry on failed SQL.
 
 ---
 
- Example Queries
+ Web App (Docker)
 
-**"Which department has the highest salary?"**
+### 1. Configure `.env`
+
 ```
-SQL: SELECT e.Department, MAX(e.Salary) FROM Sales.Employees e GROUP BY e.Department
-
-Answer: The department with the highest salary is Sales, with a maximum salary of
-$90,000 for John Smith. The Marketing department has the lowest maximum salary
-among the listed departments, which is $65,000 for Emily Johnson.
+DB_URL=sqlite:////app/database/dev.db
+FLASK_SECRET_KEY=<random-string>
 ```
 
-**"Can you return the customer names who have no information available?"**
-```
-SQL: SELECT c.FirstName + ' ' + c.LastName FROM Sales.Customers c
-     WHERE c.Score IS NULL OR c.Score = 0
+`DB_URL` can point at any SQLAlchemy-supported database (SQLite, MSSQL via `pymssql`, etc). The default SQLite path is seeded with sample `Customers`/`Orders` tables by `init_db.py` on first run.
 
-Answer: The query returned the name "Anna Adams" as there is no information
-available on customers with a score of either NULL or 0.
-```
-
-**"What are the top 3 countries by total sales?"**
-```
-SQL: SELECT TOP 3 c.Country, SUM(o.Sales) AS TotalSales
-     FROM Sales.Customers c
-     INNER JOIN Sales.Orders o ON c.CustomerID = o.CustomerID
-     GROUP BY c.Country
-
-Answer: The top 3 countries by sales are Germany and USA. Germany has generated
-$200 in total sales, while USA has generated $180 in total sales.
-```
-
----
-
- How It Works
-
-1. **Schema Extractor** — connects to your database and automatically discovers all tables, columns, types, and row counts. Formats everything into a prompt the LLM can understand.
-2. **NL to SQL Engine** — takes your question and the schema context, sends it to a local LLM via Ollama, and gets SQL back. Automatically fixes common SQL Server syntax issues.
-3. **Result Explainer** — passes the query results back to the LLM and generates a plain English summary.
-
----
- Setup
-
-### Prerequisites
-
-- Python 3.10+
-- SQL Server (local or remote)
-- [Ollama](https://ollama.com) installed and running
-
-### 1. Clone the repository
+### 2. Run
 
 ```bash
-git clone https://github.com/krishna7206/data-assistant.git
-cd data-assistant
+docker compose up --build
 ```
 
-### 2. Install dependencies
+First build compiles `llama-cpp-python` and downloads the ~350MB Qwen GGUF model — slow the first time. App serves on **port 7860**.
+
+### 3. Use it
+
+- `/` — ask questions, see generated SQL, results table, and a plain-English explanation, plus token-usage metrics per query.
+- `/stream-logs` — live server-sent-events log tail.
+- `/health` — health check, reports the connected `DATABASE_URL`.
+
+---
+
+ Desktop GUI (Ollama)
+
+### 1. Install dependencies
 
 ```bash
+cd local-desktop-gui
 pip install sqlalchemy pymssql ollama python-dotenv
-```
-
-### 3. Pull the LLM model
-
-```bash
 ollama pull llama3.2
 ```
 
-### 4. Create a `.env` file
-
-Create a file called `.env` in the project folder:
+### 2. Configure `.env`
 
 ```
 DB_URL=mssql+pymssql://your_user:your_password@your_host:your_port/your_database
 ```
 
-### 5. Set up a SQL Server login
+### 3. Run
 
-Run this in SSMS to create a read-only login for the assistant:
+```bash
+python gui.py     # Tkinter GUI with chat history
+python main.py     # CLI loop instead, if preferred
+```
+
+Requires [Ollama](https://ollama.com) running (`ollama serve`) and a SQL Server login with `db_datareader` access (see below).
+
+### SQL Server read-only login
 
 ```sql
 CREATE LOGIN datauser WITH PASSWORD = 'your_password',
@@ -105,11 +71,13 @@ CREATE USER datauser FOR LOGIN datauser;
 ALTER ROLE db_datareader ADD MEMBER datauser;
 ```
 
-### 6. Run it
+---
 
-```bash
-python main.py
-```
+ How It Works
+
+1. **Schema Extractor** (`schemaconnector.py`) — connects to the DB, discovers tables/columns/types/row counts, formats it into prompt context.
+2. **NL to SQL Engine** (`nl_to_sql.py`) — sends the question + schema context to the LLM, gets SQL back, auto-fixes common syntax issues (LIMIT→TOP, stray aliases, GROUP BY gaps, nested aggregates). The desktop GUI additionally retries once with the failed SQL + DB error fed back to the model if execution fails.
+3. **Result Explainer** — passes query results back to the LLM for a 2-3 sentence plain-English summary.
 
 ---
 
@@ -117,45 +85,40 @@ python main.py
 
 ```
 data-assistant/
-├── main.py              # entry point, interactive query loop
-├── schemaconnector.py   # connects to DB, extracts schema metadata
-├── nl_to_sql.py         # NL → SQL generation and result explanation
-├── .env                 # your credentials (not committed to Git)
+├── app.py                       # Flask web app (llama-cpp, self-contained)
+├── nl_to_sql.py                 # NL → SQL for the web app (llama-cpp backend)
+├── schemaconnector.py           # schema extraction (web app)
+├── init_db.py                   # seeds demo SQLite database
+├── templates/index.html         # web UI
+├── static/style.css             # web UI styles
+├── Dockerfile / docker-compose.yml
+├── requirements.txt
+├── local-desktop-gui/
+│   ├── gui.py                   # Tkinter desktop app (Ollama backend)
+│   ├── main.py                  # CLI entry point (Ollama backend)
+│   ├── nl_to_sql.py             # NL → SQL for the desktop app (Ollama backend)
+│   └── schemaconnector.py       # schema extraction (desktop app)
+├── .env                         # your credentials (not committed to Git)
 └── .gitignore
 ```
-
----
- Requirements
-
-| Package       | Purpose                        |
-|---------------|--------------------------------|
-| sqlalchemy    | Database connection and reflection |
-| pymssql       | SQL Server driver              |
-| ollama        | Local LLM inference            |
-| python-dotenv | Load credentials from .env     |
 
 ---
 
  Notes
 
-- This tool generates and runs SQL automatically. It is configured as read-only via the `db_datareader` role but always review generated SQL before running in production.
-- The assistant works best with [Ollama](https://ollama.com) running in the background. Start it with `ollama serve` if it is not already running.
-- If you are connecting from WSL to a SQL Server instance on Windows, make sure TCP/IP is enabled in SQL Server Configuration Manager and port 1433 (or your dynamic port) is open in Windows Firewall.
+- This tool generates and runs SQL automatically. Always review generated SQL before pointing it at a production database; use a read-only login.
+- If connecting from WSL to SQL Server on Windows, enable TCP/IP in SQL Server Configuration Manager and open port 1433 (or your dynamic port) in Windows Firewall.
+- Web app's Docker image runs the LLM in-process via `llama-cpp-python` — no separate Ollama server needed for that path.
 
 ---
 
  What's Next
-
-
 
 - [ ] Support for PostgreSQL, DuckDB, and CSV files
 - [ ] Query history logging
 
 ---
 
-## 📄 License
+## License
 
 MIT
-
-
-############################

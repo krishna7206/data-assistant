@@ -71,23 +71,32 @@ class DataAssistantGUI(tk.Tk):
         thread.start()
 
     def run_query(self, question):
-        try:
-            sql = generate_sql(question, schema_context, registry.tables, history)
+        retry_context = None
+        last_error = None
+        sql = None
+        for attempt in range(2):
+            try:
+                sql = generate_sql(question, schema_context, registry.tables, history, retry_context)
 
-            with engine.connect() as conn:
-                result = conn.execute(text(sql))
-                rows = result.fetchall()
+                with engine.connect() as conn:
+                    result = conn.execute(text(sql))
+                    rows = result.fetchall()
 
-            explanation = explain_results(question, sql, rows)
+                explanation = explain_results(question, sql, rows)
 
-            history.append({"role": "user", "content": question})
-            history.append({"role": "assistant", "content": explanation})
-            if len(history) > 8:
-                del history[:-8]
+                history.append({"role": "user", "content": question})
+                history.append({"role": "assistant", "content": explanation})
+                if len(history) > 8:
+                    del history[:-8]
 
-            self.after(0, self.show_result, sql, explanation)
-        except Exception as e:
-            self.after(0, self.show_error, str(e))
+                self.after(0, self.show_result, sql, explanation)
+                return
+            except Exception as e:
+                last_error = e
+                if sql is not None:
+                    retry_context = (sql, str(e))
+
+        self.after(0, self.show_error, str(last_error))
 
     def show_result(self, sql, explanation):
         self.append(f"SQL: {sql}", "sql")
