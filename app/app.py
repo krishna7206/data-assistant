@@ -15,7 +15,7 @@ app = Flask(__name__)
 
 # Flask sessions require a secret key to sign the session cookie.
 # Always set a secure fallback or load it from your environment (.env).
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "super-secret-dev-key-change-me")
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 # ------------------------------------------------------------------
 # Database setup
