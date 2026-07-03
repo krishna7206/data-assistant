@@ -31,11 +31,7 @@ services:
       - ollama_data:/root/.ollama  # Persists your downloaded LLM models
     restart: unless-stopped
     # This entrypoint boots up the Ollama server, waits for it, and automatically downloads the model
-    entrypoint: [
-      "/bin/sh", 
-      "-c", 
-      "ollama serve & sleep 5 && ollama pull llama3.2 && wait"
-    ]
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull qwen2.5:0.5b && wait"]
 
 volumes:
   ollama_data:  # Declares the persistent volume for LLM storage
