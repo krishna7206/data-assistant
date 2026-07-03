@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        /* Absolute overlay hidden by default */
+        #loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(255, 255, 255, 0.95);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            font-family: system-ui, sans-serif;
+        }
+
+        /* The core rotating CSS spinner */
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #28a745;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Subtle progress text steps pulse effect */
+        .pulse-text {
+            font-size: 1.1em;
+            color: #333;
+            font-weight: bold;
+            animation: pulse 1.8s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+    </style>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Natural Language SQL Assistant</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+<body>
+    <!-- Background Running Activity Screen Overlay -->
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div class="pulse-text">⚙️ Processing Local Model Request Pipeline...</div>
+        <div style="margin-top: 15px; font-size: 0.85em; color: #666; text-align: center; max-width: 400px; line-height: 1.5;">
+            Tokens are evaluating through the Qwen matrix layers on Hugging Face CPU. This roundtrip takes roughly 20-40 seconds. Please do not close or reload.
+        </div>
+    </div>
+
+<div class="container">
+
+    <header>
+
+        <h1>Natural Language SQL Assistant</h1> 
+               Built by <a href="https://www.linkedin.com/in/krishna-nambiar-a04a8282" target="_blank">Krishna Nambiar</a> & <a href="https://www.linkedin.com/in/shreyasgune/" target  ="_blank">Shreyas Gune</a>
+               </br>
+            Model Used: <a href="https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/blob/main/qwen2.5-0.5b-instruct-q5_0.gguf" target="_blank">Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q5_0.gguf | Size: 490MB </a>
+               </br>
+        <p class="subtitle">
+            Connected to {{ table_count }} tables
+        </p>
+
+        <p class="tables">
+            {{ tables }}
+        </p>
+
+    </header>
+
+    <!-- <div class="schema-container" style="margin-bottom: 20px; border: 1px solid #ccc; padding: 15px; border-radius: 5px; background-color: #f9f9f9;">
+        <details>
+            <summary style="font-weight: bold; cursor: pointer; font-size: 1.1em;">
+                View Database Schema Info ({{table_count}} Tables)
+            </summary>
+            <div style="margin-top: 10px;">
+                <p style="font-size: 0.9em; color: #555;">Use these table and column structures to phrase your natural language queries:</p>
+                <pre style="background: #272822; color: #f8f8f2; padding: 15px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 0.85em;">{{ schema_context }}</pre>
+            </div>
+        </details>
+    </div> -->
+
+    <!-- <form method="POST" action="/" onsubmit="document.getElementById('submit-btn').disabled=true; document.getElementById('submit-btn').innerText='Computing...';">
+        <input type="text" name="question" value="{{ question }}" placeholder="Ask a question like : Top 10 Customers by Sales" required style="width: 75%; padding: 10px;">
+        
+        <button type="submit" id="submit-btn" style="padding: 10px 20px; font-weight: bold;">
+            Ask Assistant
+        </button>
+    </form> -->
+
+    <!-- Form trigger automatically reveals the overlay window -->
+    <form method="POST" action="/" onsubmit="document.getElementById('loading-overlay').style.display = 'flex';">
+        <input type="text" name="question" value="{{ question }}" placeholder="Ask a question about your data: Top 10 Customers by Sales" required style="width: 75%; padding: 10px; font-size: 1.1em;">
+        <button type="submit" style="padding: 10px 20px; font-size: 1.1em; font-weight: bold; cursor: pointer;">
+            Ask Assistant
+        </button>
+    </form>
+
+    <!-- 📊 Static State Progress Bar Widget -->
+    {% if question %}
+    <div class="progress-widget" style="margin: 20px 0; border: 1px solid #e0e0e0; padding: 15px; border-radius: 6px; background-color: #fafafa; font-family: sans-serif;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9em;">
+            <span style="font-weight: bold; color: #333;">
+                {% if error %}
+                     Pipeline Execution Halted
+                {% elif sql and explanation %}
+                     4/4 Steps Completed Successfully
+                {% else %}
+                     Processing Request Pipeline...
+                {% endif %}
+            </span>
+            <span style="font-family: monospace; font-weight: bold;">
+                {% if error %} 100% {% elif sql and explanation %} 100% {% else %} 50% {% endif %}
+            </span>
+        </div>
+
+        <div style="width: 100%; background-color: #e0e0e0; border-radius: 4px; height: 14px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);">
+            <div style="
+                height: 100%; 
+                transition: width 0.4s ease;
+                {% if error %}
+                    width: 100%; background-color: #dc3545;
+                {% elif sql and explanation %}
+                    width: 100%; background-color: #28a745;
+                {% else %}
+                    width: 50%; background-color: #ffc107;
+                {% endif %}
+            "></div>
+        </div>
+
+        <!-- Step Breakdown Text -->
+        <div style="margin-top: 10px; font-size: 0.85em; color: #666; display: flex; flex-direction: column; gap: 4px;">
+            <div> [Step 1] Ingested user question context: <em>"{{ question }}"</em></div>
+            {% if sql or error %}
+                <div> [Step 2] SQL code compilation complete.</div>
+            {% endif %}
+            {% if rows or error %}
+                <div> [Step 3] SQLite engine matrix search complete.</div>
+            {% endif %}
+            {% if explanation or error %}
+                <div> [Step 4] Natural language analysis summary generated.</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    
+    {% if error %}
+
+    <div class="card error">
+
+        <h2>Error</h2>
+
+        <pre>{{ error }}</pre>
+
+    </div>
+
+    {% endif %}
+
+
+    {% if sql %}
+
+    <div class="card">
+
+        <h2>Generated SQL</h2>
+
+        <pre>{{ sql }}</pre>
+
+    </div>
+
+    {% endif %}
+
+
+    {% if headers %}
+
+    <div class="card">
+
+        <h2>Results</h2>
+
+        <div class="table-wrapper">
+
+        <table>
+
+            <thead>
+
+                <tr>
+
+                {% for h in headers %}
+
+                    <th>{{ h }}</th>
+
+                {% endfor %}
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+            {% for row in rows %}
+
+                <tr>
+
+                {% for value in row %}
+
+                    <td>{{ value }}</td>
+
+                {% endfor %}
+
+                </tr>
+
+            {% endfor %}
+
+            </tbody>
+
+        </table>
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+
+    {% if explanation %}
+
+    <div class="card">
+
+        <h2>AI Explanation</h2>
+
+        <p>{{ explanation }}</p>
+
+    </div>
+
+    {% endif %}
+
+    <!-- Performance Metrics Widget Panel -->
+    {% if metrics %}
+    <div class="metrics-card" style="margin-top: 30px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fcfcfc; padding: 15px; font-family: system-ui, sans-serif;">
+        <h4 style="margin: 0 0 10px 0; color: #555; display: flex; align-items: center; gap: 5px;">
+            Model Performance Info (Qwen 0.5B local)
+        </h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; font-size: 0.9em;">
+            <div style="background: #fff; padding: 10px; border-radius: 4px; border: 1px solid #eaeaea;">
+                <div style="color: #888; font-size: 0.8em; text-transform: uppercase;">SQL Prompt</div>
+                <strong style="font-size: 1.2em; color: #333;">{{ metrics.sql_prompt_tokens }}</strong> <span style="color: #999; font-size: 0.8em;">tokens</span>
+            </div>
+            <div style="background: #fff; padding: 10px; border-radius: 4px; border: 1px solid #eaeaea;">
+                <div style="color: #888; font-size: 0.8em; text-transform: uppercase;">SQL Generated</div>
+                <strong style="font-size: 1.2em; color: #4caf50;">{{ metrics.sql_gen_tokens }}</strong> <span style="color: #999; font-size: 0.8em;">tokens</span>
+            </div>
+            <div style="background: #fff; padding: 10px; border-radius: 4px; border: 1px solid #eaeaea;">
+                <div style="color: #888; font-size: 0.8em; text-transform: uppercase;">Summary Prompt</div>
+                <strong style="font-size: 1.2em; color: #333;">{{ metrics.exp_prompt_tokens }}</strong> <span style="color: #999; font-size: 0.8em;">tokens</span>
+            </div>
+            <div style="background: #fff; padding: 10px; border-radius: 4px; border: 1px solid #eaeaea;">
+                <div style="color: #888; font-size: 0.8em; text-transform: uppercase;">Summary Generated</div>
+                <strong style="font-size: 1.2em; color: #4caf50;">{{ metrics.exp_gen_tokens }}</strong> <span style="color: #999; font-size: 0.8em;">tokens</span>
+            </div>
+        </div>
+        <div style="margin-top: 12px; padding-top: 8px; border-top: 1px dashed #e0e0e0; font-size: 0.85em; color: #666; text-align: right;">
+            Total Roundtrip Compute Context footprint: <strong>{{ metrics.total_tokens }} tokens</strong>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+
+
+<!-- <div class="log-panel" style="margin-top: 30px;">
+    <h3 style="font-family: sans-serif; color: #333;">Real-Time Application Logs</h3>
+    <div id="live-console" style="
+        background-color: #1e1e1e; 
+        color: #00ff00; 
+        font-family: 'Courier New', Courier, monospace; 
+        padding: 15px; 
+        border-radius: 6px; 
+        height: 250px; 
+        overflow-y: scroll; 
+        font-size: 0.85em;
+        line-height: 1.4;
+        box-shadow: inset 0 0 10px #000;
+    ">
+        <p style="color: #888; margin: 0;">[SYSTEM] Connecting to server runtime stream...</p>
+    </div>
+</div>
+
+<script>
+    async function startLogStream() {
+        const consoleEl = document.getElementById('live-console');
+        
+        try {
+            const response = await fetch('/stream-logs');
+            if (!response.ok) throw new Error('Failed to connect to stream.');
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                // Decode incoming chunks and append them directly to the console area
+                const chunkText = decoder.decode(value, { stream: true });
+                
+                // Filter out the EventSource formatting lines (data: ...)
+                const cleanLines = chunkText
+                    .split('\n')
+                    .filter(line => line.startsWith('data: '))
+                    .map(line => line.replace('data: ', ''));
+
+                cleanLines.forEach(line => {
+                    if (line.trim()) {
+                        const logLine = document.createElement('p');
+                        logLine.style.margin = '0';
+                        logLine.textContent = line;
+                        consoleEl.appendChild(logLine);
+                    }
+                });
+
+                // Auto-scroll the terminal to the bottom as new lines print out
+                consoleEl.scrollTop = consoleEl.scrollHeight;
+            }
+        } catch (err) {
+            const errLine = document.createElement('p');
+            errLine.style.color = '#ff0000';
+            errLine.style.margin = '0';
+            errLine.textContent = `[ERROR] Connection disconnected: ${err.message}`;
+            consoleEl.appendChild(errLine);
+        }
+    }
+
+    // Trigger the background stream receiver loop as soon as the DOM loads
+    document.addEventListener('DOMContentLoaded', startLogStream);
+</script> -->
+
+</body>
+</html>
