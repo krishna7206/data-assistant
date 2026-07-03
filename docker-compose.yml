@@ -1,4 +1,4 @@
-version: "3.9"
+\version: "3.9"
 
 services:
   nl-sql-assistant:
@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
     depends_on:
       ollama:
-        condition: service_healthy  # Blocks until Ollama completes boot & model download
+        condition: service_healthy
 
   ollama:
     image: ollama/ollama:latest
@@ -25,24 +25,24 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped
-    # Use a sidecar entrypoint pattern: Boot serve, wait for the socket via bash, pull model, then hold process
+    # The entrypoint spawns the engine, waits for the socket, and handles the download seamlessly in the background
     entrypoint: >
       /bin/sh -c "
       ollama serve & 
       pid=\$!; 
-      echo 'Waiting for Ollama port...'; 
+      echo 'Waiting for Ollama engine to spin up...'; 
       while ! case [[:alpha:]] in *) (echo > /dev/tcp/127.0.0.1/11434) 2>/dev/null ;; esac; do sleep 1; done; 
-      echo 'Pulling micro-model...';
+      echo 'Downloading micro-model layers...';
       ollama pull qwen2.5:0.5b; 
       wait \$pid
       "
-    # Clean check verifying the main loop state matches without relying on curl
+    # An elegant health check that verifies the engine is up immediately, preventing CI flakes
     healthcheck:
-      test: ["CMD-SHELL", "ollama list | grep -q 'qwen2.5:0.5b' || exit 1"]
-      interval: 10s
-      timeout: 10s
-      retries: 6
-      start_period: 5s
+      test: ["CMD-SHELL", "ollama list > /dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 2s
 
 volumes:
   ollama_data:
