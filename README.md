@@ -32,6 +32,11 @@ First build compiles `llama-cpp-python` and downloads the ~350MB Qwen GGUF model
 - `/stream-logs` — live server-sent-events log tail.
 - `/health` — health check, reports the connected `DATABASE_URL`.
 
+  <img width="1460" height="855" alt="image" src="https://github.com/user-attachments/assets/1d4619a5-82a9-4c7e-a655-589fc15cfb22" />
+  <img width="1515" height="687" alt="image" src="https://github.com/user-attachments/assets/16948c31-a00e-42cd-92f0-f7bac5407198" />
+
+
+
 ---
 
  Desktop GUI (Ollama)
