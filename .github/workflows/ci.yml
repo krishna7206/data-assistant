@@ -18,62 +18,31 @@ jobs:
       # 2. Set up Docker Buildx for cleaner layer caching
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        
+      # 3. Authenticate against GitHub Container Registry (ghcr.io)
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }} # Automatically provided by GitHub Actions
 
-      # 3. Build the Docker image to verify there are no compile/dependency issues
-      - name: Build Docker Image
+      # 4. Lowercase the repository name (Docker tags must be strictly lowercase)
+      - name: Format Image Name
+        id: string
+        run: echo "image_name=$(echo 'ghcr.io/${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      # 5. Build the self-contained image AND push it to GHCR
+      - name: Build and Push Docker Image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          load: true # Loads the built image directly into the local Docker daemon
-          tags: nl-sql-assistant:latest
+          load: true  # Loads it to the local runner daemon so we can test it in step 7
+          push: ${{ github.event_name != 'pull_request' }} # Only push to GHCR on main branch commits, not PRs
+          tags: |
+            ${{ steps.string.outputs.image_name }}:latest
+            ${{ steps.string.outputs.image_name }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # 4. Create dummy environment file and database directories so the container runs safely in CI
-      - name: Prepare Test Environment
-        run: |
-          mkdir -p database
-          touch database/dev.db
-          echo "DB_URL=sqlite:///database/dev.db" > .env
-          echo "FLASK_SECRET_KEY=ci-testing-secret-key" >> .env
-          echo "OLLAMA_MODEL=qwen2.5:0.5b" >> .env
-          echo "OLLAMA_HOST=http://ollama:11434" >> .env
-
-      # 5. Boot up the service infrastructure via Docker Compose
-      - name: Start Services
-        run: docker compose up -d
-
-      # 6. Monitor the container until the healthcheck command finishes initializing successfully
-      - name: Verify Container Health
-        run: |
-          echo "Waiting for application container to become healthy..."
-          
-          # Increased to 36 retries (3 minutes total) to give Ollama time to pull the model
-          for i in {1..36}; do
-            STATUS=$(docker inspect --format='{{.State.Health.Status}}' nl-sql-assistant 2>/dev/null || echo "starting")
-            echo "Current Status: $STATUS"
-            
-            if [ "$STATUS" = "healthy" ]; then
-              echo "Success! Container is healthy and passing endpoints."
-              exit 0
-            elif [ "$STATUS" = "unhealthy" ]; then
-              echo "Error: Container reported an unhealthy state."
-              docker logs nl-sql-assistant
-              docker logs ollama
-              exit 1
-            fi
-            sleep 5
-          done
-
-          echo "Timeout: Container did not transition to a healthy state in time."
-          echo "=== Assistant Logs ==="
-          docker logs nl-sql-assistant
-          echo "=== Ollama Logs ==="
-          docker logs ollama
-          exit 1
-
-      # 7. Gracefully spin down container logs and print them out for workflow artifacts if everything finishes
-      - name: Stop Services
-        if: always()
-        run: docker compose down
