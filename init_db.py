@@ -1,4 +1,4 @@
-# database/init_db.py
+#init_db.py
 import sqlite3
 import os
 
