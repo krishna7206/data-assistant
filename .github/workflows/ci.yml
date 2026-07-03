@@ -37,7 +37,7 @@ jobs:
           touch database/dev.db
           echo "DB_URL=sqlite:///database/dev.db" > .env
           echo "FLASK_SECRET_KEY=ci-testing-secret-key" >> .env
-          echo "OLLAMA_MODEL=llama3.2" >> .env
+          echo "OLLAMA_MODEL=qwen2.5:0.5b" >> .env
           echo "OLLAMA_HOST=http://ollama:11434" >> .env
 
       # 5. Boot up the service infrastructure via Docker Compose
