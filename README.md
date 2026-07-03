@@ -14,11 +14,6 @@ Built with Python, SQLAlchemy, and a local LLM running via Ollama. No API keys, 
 
 
 
- 
-
-
-
-
 ---
 
  Example Queries
