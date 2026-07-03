@@ -130,8 +130,7 @@ data-assistant/
 ```
 
 ---
-
-## 📋 Requirements
+ Requirements
 
 | Package       | Purpose                        |
 |---------------|--------------------------------|
