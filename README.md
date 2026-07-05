@@ -36,6 +36,12 @@ First build compiles `llama-cpp-python` and downloads the ~350MB Qwen GGUF model
   <img width="1515" height="687" alt="image" src="https://github.com/user-attachments/assets/16948c31-a00e-42cd-92f0-f7bac5407198" />
 
 
+  ### Running without Docker (e.g. WSL)
+
+The web app doesn't require Docker. Install the system build deps (`gcc g++ make cmake wget sqlite3`), then `pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu` followed by `pip install -r requirements.txt`. Download the model with `wget -O models/qwen.gguf https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf` and update the `model_path` in `nl_to_sql.py` to `models/qwen.gguf` (it's hardcoded to `/app/models/qwen.gguf` for the container). Point `DB_URL` in `.env` at a local path (e.g. `sqlite:///./database/dev.db`), run `python init_db.py` to seed it, then start the app with `python app.py` or `gunicorn -w 1 -k sync --timeout 300 -b 0.0.0.0:7860 app:app`.
+
+
+
 
 ---
 
