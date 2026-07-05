@@ -119,8 +119,8 @@ data-assistant/
 
  What's Next
 
-- [ ] Support for PostgreSQL, DuckDB, and CSV files
-- [ ] Query history logging
+- [ ] Support for PostgreSQL, DuckDB, and CSV files - Adding in more support for different formats, the idea would be to support more fucntionalities, learn by tuning the model for syntax differences
+- [ ] Query history logging - This feature would help with model accuracy as we could draw on this question bank to improve the models ability to answer more complicated queries
 
 ---
 
