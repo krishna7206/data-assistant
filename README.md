@@ -1,74 +1,91 @@
- NL to SQL Data Assistant
+# NL to SQL Data Assistant
 
-Query your database in plain English. Two ways to run it:
+Query your database in plain English — no SQL required. Ask a question, see the generated SQL, the results, and a plain-English explanation.
 
-- **Web app** (`app.py`) — self-contained Flask app, local LLM via `llama-cpp-python` (no Ollama, no API keys), ships in Docker with a bundled Qwen2.5-0.5B model. Works against a demo SQLite database out of the box.
-- **Desktop GUI** (`local-desktop-gui/`) — Tkinter app that talks to SQL Server through Ollama (`llama3.2`), with conversation history and auto-retry on failed SQL.
+The project ships two independent ways to run it:
+
+| | Web App (`app.py`) | Desktop GUI (`local-desktop-gui/`) |
+|---|---|---|
+| **Interface** | Flask web app | Tkinter desktop app |
+| **LLM backend** | Local, via `llama-cpp-python` (no Ollama, no API keys) | Ollama (`llama3.2`) |
+| **Database** | Any SQLAlchemy-supported DB (ships with demo SQLite) | SQL Server (via `pymssql`) |
+| **Setup** | Docker, one command | Local Python install |
+| **Extras** | Token-usage metrics, live log stream | Conversation history, auto-retry on failed SQL |
 
 ---
 
- Web App (Docker)
+## Quick Start — Web App (Docker)
 
-### 1. Configure `.env`
-
+**1. Configure `.env`**
 ```
 DB_URL=sqlite:////app/database/dev.db
 FLASK_SECRET_KEY=<random-string>
 ```
+`DB_URL` accepts any SQLAlchemy-supported database (SQLite, MSSQL via `pymssql`, etc.). The default SQLite path is seeded automatically with sample `Customers`/`Orders` tables on first run.
 
-`DB_URL` can point at any SQLAlchemy-supported database (SQLite, MSSQL via `pymssql`, etc). The default SQLite path is seeded with sample `Customers`/`Orders` tables by `init_db.py` on first run.
-
-### 2. Run
-
-```bash
+**2. Run**
+```
 docker compose up --build
 ```
+The first build compiles `llama-cpp-python` and downloads the ~350MB Qwen2.5-0.5B GGUF model — this is slow the first time only. The app serves on **port 7860**.
 
-First build compiles `llama-cpp-python` and downloads the ~350MB Qwen GGUF model — slow the first time. App serves on **port 7860**.
+**3. Use it**
 
-### 3. Use it
+| Route | Description |
+|---|---|
+| `/` | Ask questions; see generated SQL, results table, plain-English explanation, and per-query token-usage metrics |
+| `/stream-logs` | Live server-sent-events log tail |
+| `/health` | Health check; reports the connected `DATABASE_URL` |
 
-- `/` — ask questions, see generated SQL, results table, and a plain-English explanation, plus token-usage metrics per query.
-- `/stream-logs` — live server-sent-events log tail.
-- `/health` — health check, reports the connected `DATABASE_URL`.
+### Running without Docker (e.g. WSL)
 
-  
-### If you running WSL
+The web app doesn't require Docker.
 
-The web app doesn't require Docker. Install the system build deps (`gcc g++ make cmake wget sqlite3`), then `pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu` followed by `pip install -r requirements.txt`. Download the model with `wget -O models/qwen.gguf https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf` and update the `model_path` in `nl_to_sql.py` to `models/qwen.gguf` (it's hardcoded to `/app/models/qwen.gguf` for the container). Point `DB_URL` in `.env` at a local path (e.g. `sqlite:///./database/dev.db`), run `python init_db.py` to seed it, then start the app with `python app.py` or `gunicorn -w 1 -k sync --timeout 300 -b 0.0.0.0:7860 app:app`.
-
-
-
+1. Install system build dependencies: `gcc g++ make cmake wget sqlite3`
+2. Install Python dependencies:
+   ```
+   pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+   pip install -r requirements.txt
+   ```
+3. Download the model:
+   ```
+   wget -O models/qwen.gguf https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf
+   ```
+4. Update `model_path` in `nl_to_sql.py` to `models/qwen.gguf` (it's hardcoded to `/app/models/qwen.gguf` for the container).
+5. Point `DB_URL` in `.env` at a local path, e.g. `sqlite:///./database/dev.db`.
+6. Seed the database: `python init_db.py`
+7. Start the app:
+   ```
+   python app.py
+   # or, for production:
+   gunicorn -w 1 -k sync --timeout 300 -b 0.0.0.0:7860 app:app
+   ```
 
 ---
 
- Desktop GUI (Ollama)
+## Quick Start — Desktop GUI (Ollama)
 
-### 1. Install dependencies
-
-```bash
+**1. Install dependencies**
+```
 cd local-desktop-gui
 pip install sqlalchemy pymssql ollama python-dotenv
 ollama pull llama3.2
 ```
 
-### 2. Configure `.env`
-
+**2. Configure `.env`**
 ```
 DB_URL=mssql+pymssql://your_user:your_password@your_host:your_port/your_database
 ```
 
-### 3. Run
-
-```bash
+**3. Run**
+```
 python gui.py     # Tkinter GUI with chat history
 python main.py     # CLI loop instead, if preferred
 ```
 
-Requires [Ollama](https://ollama.com) running (`ollama serve`) and a SQL Server login with `db_datareader` access (see below).
+Requires Ollama running (`ollama serve`) and a SQL Server login with `db_datareader` access (see below).
 
 ### SQL Server read-only login
-
 ```sql
 CREATE LOGIN datauser WITH PASSWORD = 'your_password',
     CHECK_POLICY = OFF,
@@ -81,55 +98,46 @@ ALTER ROLE db_datareader ADD MEMBER datauser;
 
 ---
 
- How It Works
+## How It Works
 
-1. **Schema Extractor** (`schemaconnector.py`) — connects to the DB, discovers tables/columns/types/row counts, formats it into prompt context.
-2. **NL to SQL Engine** (`nl_to_sql.py`) — sends the question + schema context to the LLM, gets SQL back, auto-fixes common syntax issues (LIMIT→TOP, stray aliases, GROUP BY gaps, nested aggregates). The desktop GUI additionally retries once with the failed SQL + DB error fed back to the model if execution fails.
-3. **Result Explainer** — passes query results back to the LLM for a 2-3 sentence plain-English summary.
+1. **Schema Extractor** (`schemaconnector.py`) — connects to the database, discovers tables, columns, types, and row counts, and formats it into prompt context.
+2. **NL-to-SQL Engine** (`nl_to_sql.py`) — sends the question plus schema context to the LLM and gets SQL back. Auto-fixes common syntax issues (`LIMIT` → `TOP`, stray aliases, `GROUP BY` gaps, nested aggregates). The desktop GUI additionally retries once, feeding the failed SQL and the database error back to the model.
+3. **Result Explainer** — passes query results back to the LLM for a 2–3 sentence plain-English summary.
 
 ---
 
- Project Structure
+## Project Structure
 
 ```
 data-assistant/
-├── app.py                       # Flask web app (llama-cpp, self-contained)
-├── nl_to_sql.py                 # NL → SQL for the web app (llama-cpp backend)
-├── schemaconnector.py           # schema extraction (web app)
-├── init_db.py                   # seeds demo SQLite database
-├── templates/index.html         # web UI
-├── static/style.css             # web UI styles
+├── app.py                       # Flask web app (llama-cpp backend)
+├── nl_to_sql.py                 # NL → SQL for the web app
+├── schemaconnector.py           # Schema extraction (web app)
+├── init_db.py                   # Seeds the demo SQLite database
+├── templates/index.html         # Web UI
+├── static/style.css             # Web UI styles
 ├── Dockerfile / docker-compose.yml
 ├── requirements.txt
 ├── local-desktop-gui/
 │   ├── gui.py                   # Tkinter desktop app (Ollama backend)
 │   ├── main.py                  # CLI entry point (Ollama backend)
-│   ├── nl_to_sql.py             # NL → SQL for the desktop app (Ollama backend)
-│   └── schemaconnector.py       # schema extraction (desktop app)
-├── .env                         # your credentials (not committed to Git)
+│   ├── nl_to_sql.py             # NL → SQL for the desktop app
+│   └── schemaconnector.py       # Schema extraction (desktop app)
+├── .env                         # Your credentials (not committed to Git)
 └── .gitignore
 ```
 
 ---
 
- Notes
+## Notes & Safety
 
-- This tool generates and runs SQL automatically. Always review generated SQL before pointing it at a production database; use a read-only login.
-- If connecting from WSL to SQL Server on Windows, enable TCP/IP in SQL Server Configuration Manager and open port 1433 (or your dynamic port) in Windows Firewall.
-- Web app's Docker image runs the LLM in-process via `llama-cpp-python` — no separate Ollama server needed for that path.
-
----
-
-  <img width="1460" height="855" alt="image" src="https://github.com/user-attachments/assets/1d4619a5-82a9-4c7e-a655-589fc15cfb22" />
-  <img width="1515" height="687" alt="image" src="https://github.com/user-attachments/assets/16948c31-a00e-42cd-92f0-f7bac5407198" />
-
- What's Next
-
-- [ ] Support for PostgreSQL, DuckDB, and CSV files - Adding in more support for different formats, the idea would be to support more fucntionalities, learn by tuning the model for syntax differences
-- [ ] Query history logging - This feature would help with model accuracy as we could draw on this question bank to improve the models ability to answer more complicated queries
+- This tool generates and executes SQL automatically. **Always review generated SQL before pointing it at a production database, and use a read-only login.**
+- Connecting from WSL to SQL Server on Windows: enable TCP/IP in SQL Server Configuration Manager and open port 1433 (or your dynamic port) in Windows Firewall.
+- The web app's Docker image runs the LLM in-process via `llama-cpp-python` — no separate Ollama server needed for that path.
 
 ---
 
-## License
+## Roadmap
 
-MIT
+- [ ] Support for PostgreSQL, DuckDB, and CSV files — broaden format support and fine-tune the model on the resulting syntax differences
+- [ ] Query history logging — build a question bank from past queries to improve accuracy on more complex questions
